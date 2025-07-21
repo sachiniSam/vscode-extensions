@@ -160,10 +160,71 @@ export function TypeCreatorTab(props: TypeCreatorTabProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [tempName, setTempName] = useState("");
     const saveButtonClicked = useRef(false);
+    
+    // Add state for extended type fields
+    const [extendedTypeFields, setExtendedTypeFields] = useState<{ [typeName: string]: Member[] }>({});
 
     const { rpcClient } = useRpcContext();
 
     const nameInputRef = useRef<HTMLInputElement | null>(null);
+
+    // Function to fetch extended type fields
+    const fetchExtendedTypeFields = useCallback(async (typeName: string): Promise<Member[]> => {
+        if (!rpcClient) return [];
+        
+        try {
+            const projectUri = await rpcClient.getVisualizerLocation().then((res) => res.projectUri);
+            
+            const response = await rpcClient.getBIDiagramRpcClient().getTypes({
+                filePath: Utils.joinPath(URI.file(projectUri), 'types.bal').fsPath
+            });
+
+            // Find the specific type by name and extract its fields
+            const targetType = response.types.find((typeModel: any) => typeModel.name === typeName);
+            
+            if (targetType && targetType.members) {
+                // Return the actual fields from the type model
+                return targetType.members;
+            }
+
+            return [];
+        } catch (error) {
+            console.error(`Error fetching fields for type ${typeName}:`, error);
+            return [];
+        }
+    }, [rpcClient]);
+
+    // Effect to fetch extended type fields when type.includes changes
+    useEffect(() => {
+        if (!type?.includes) return;
+        
+        const fetchAllExtendedFields = async () => {
+            const newExtendedFields: { [typeName: string]: Member[] } = { ...extendedTypeFields };
+            
+            for (const typeName of type.includes) {
+                if (!newExtendedFields[typeName]) {
+                    const fields = await fetchExtendedTypeFields(typeName);
+                    newExtendedFields[typeName] = fields;
+                }
+            }
+            
+            setExtendedTypeFields(newExtendedFields);
+        };
+        
+        fetchAllExtendedFields();
+    }, [type?.includes, fetchExtendedTypeFields]);
+
+    // Handler to remove an extended type
+    const handleRemoveExtendedType = (typeToRemove: string) => {
+        // Remove from type.includes
+        const updatedIncludes = (type.includes || []).filter(t => t !== typeToRemove);
+        setType({ ...type, includes: updatedIncludes });
+        
+        // Clean up extended type fields cache
+        const updatedExtendedFields = { ...extendedTypeFields };
+        delete updatedExtendedFields[typeToRemove];
+        setExtendedTypeFields(updatedExtendedFields);
+    };
 
     useEffect(() => {
         if (editingType) {
@@ -415,8 +476,10 @@ export function TypeCreatorTab(props: TypeCreatorTabProps) {
                             onChange={setType}
                             isGraphql={isGraphql}
                             onValidationError={handleValidationError}
+                            extendedTypeFields={extendedTypeFields}
+                            onRemoveExtendedType={handleRemoveExtendedType}
                         />
-                        <AdvancedOptions type={type} onChange={setType} />
+                        <AdvancedOptions type={type} onChange={setType} showExtendSection={true} />
                     </>
                 );
             case TypeKind.ENUM:

@@ -39,12 +39,44 @@ const SectionTitle = styled.div`
         margin-bottom: 4px;
     `;
 
+const ExtendedTypeSection = styled.div`
+        margin-bottom: 16px;
+        border: 1px solid var(--vscode-welcomePage-tileBorder);
+        border-radius: 4px;
+        overflow: hidden;
+    `;
+
+const ExtendedTypeHeader = styled.div`
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background-color: var(--vscode-editor-inactiveSelectionBackground);
+        cursor: pointer;
+        border-bottom: 1px solid var(--vscode-welcomePage-tileBorder);
+    `;
+
+const ExtendedTypeContent = styled.div`
+        padding: 8px;
+        background-color: var(--vscode-editor-background);
+    `;
+
+const ReadOnlyIndicator = styled.span`
+        font-size: 11px;
+        color: var(--vscode-descriptionForeground);
+        font-style: italic;
+        margin-left: auto;
+    `;
+
 interface RecordEditorProps {
     type: Type;
     isAnonymous: boolean;
     onChange: (type: Type) => void;
     isGraphql?: boolean;
     onValidationError: (isError: boolean) => void;
+    extendedTypeFields?: { [typeName: string]: Member[] };
+    onRemoveExtendedType?: (typeName: string) => void;
+    readOnly?: boolean;
 }
 
 interface FieldValidationError {
@@ -53,11 +85,25 @@ interface FieldValidationError {
 }
 
 export const RecordEditor = forwardRef<{ addMember: () => void }, RecordEditorProps>((props, ref) => {
-    const { type, isAnonymous = false, onChange, isGraphql, onValidationError } = props;
+    const { type, isAnonymous = false, onChange, isGraphql, onValidationError, extendedTypeFields = {}, onRemoveExtendedType, readOnly } = props;
 
     const [validationErrors, setValidationErrors] = useState<FieldValidationError[]>([{ identifier: false, type: false }]);
     const [hasRecordError, setHasRecordError] = useState(false);
+    const [expandedExtendedTypes, setExpandedExtendedTypes] = useState<Set<string>>(new Set());
 
+    const getExtendedTypeFields = (typeName: string): Member[] => {
+        return extendedTypeFields[typeName] || [];
+    };
+
+    const toggleExtendedType = (typeName: string) => {
+        const newExpanded = new Set(expandedExtendedTypes);
+        if (newExpanded.has(typeName)) {
+            newExpanded.delete(typeName);
+        } else {
+            newExpanded.add(typeName);
+        }
+        setExpandedExtendedTypes(newExpanded);
+    };
 
     const handleFieldValidation = (functionIndex: number, isIdentifier: boolean, hasError: boolean) => {
         setValidationErrors(prev => {
@@ -120,11 +166,75 @@ export const RecordEditor = forwardRef<{ addMember: () => void }, RecordEditorPr
             {!isAnonymous &&
                 <Header>
                     <SectionTitle>{isGraphql ? 'Input Object Fields' : 'Fields'}</SectionTitle>
-                    <div style={{ display: 'flex', gap: '8px' }} data-testid="add-field-button">
-                        <Button appearance="icon" onClick={addMember}><Codicon name="add" /></Button>
-                    </div>
+                    {!readOnly && (
+                        <div style={{ display: 'flex', gap: '8px' }} data-testid="add-field-button">
+                            <Button appearance="icon" onClick={addMember}><Codicon name="add" /></Button>
+                        </div>
+                    )}
                 </Header>
             }
+            
+            {/* Extended Types Section */}
+            {type.includes && type.includes.length > 0 && type.includes.map((extendedTypeName) => {
+                const isExpanded = expandedExtendedTypes.has(extendedTypeName);
+                const isLoading = false; // No longer loading, fields are passed as props
+                const extendedFields = getExtendedTypeFields(extendedTypeName);
+                
+                return (
+                    <ExtendedTypeSection key={extendedTypeName}>
+                        <ExtendedTypeHeader onClick={() => toggleExtendedType(extendedTypeName)}>
+                            <Codicon name={isExpanded ? "chevron-down" : "chevron-right"} />
+                            <span style={{ fontSize: '13px', fontWeight: '500' }}>
+                                {extendedTypeName}
+                            </span>
+                            {isLoading && <span style={{ fontSize: '11px', color: 'var(--vscode-descriptionForeground)' }}>Loading...</span>}
+                            <ReadOnlyIndicator>extended type</ReadOnlyIndicator>
+                            {onRemoveExtendedType && (
+                                <Button 
+                                    appearance="icon" 
+                                    onClick={() => onRemoveExtendedType(extendedTypeName)}
+                                    tooltip={`Remove ${extendedTypeName}`}
+                                    sx={{ marginLeft: '8px', color: 'var(--vscode-editorErrorForeground)' }}
+                                >
+                                <Codicon name="trash" />
+                        </Button>
+                            )}
+                        </ExtendedTypeHeader>
+                        {isExpanded && !isLoading && (
+                            <ExtendedTypeContent>
+                                {extendedFields.length > 0 ? (
+                                    extendedFields.map((field, fieldIndex) => (
+                                        <FieldEditor
+                                            key={`${extendedTypeName}-${fieldIndex}`}
+                                            member={field}
+                                            onChange={() => {}} // Extended fields are read-only for display
+                                            onDelete={() => {}} // Extended fields can't be deleted individually
+                                            type={type}
+                                            extendedTypeFields={extendedTypeFields}
+                                            onValidationError={onValidationError}
+                                            onFieldValidation={(isIdentifier, hasError) => handleFieldValidation(fieldIndex, isIdentifier, hasError)}
+                                            onRecordValidation={handleNestedRecordError}
+                                            onRemoveExtendedType={onRemoveExtendedType}
+                                            readOnly={true}
+                                        />
+                                    ))
+                                ) : (
+                                    <div style={{ 
+                                        padding: '8px', 
+                                        color: 'var(--vscode-descriptionForeground)', 
+                                        fontSize: '12px',
+                                        fontStyle: 'italic'
+                                    }}>
+                                        No fields found for this type
+                                    </div>
+                                )}
+                            </ExtendedTypeContent>
+                        )}
+                    </ExtendedTypeSection>
+                );
+            })}
+            
+            {/* Regular Fields Section */}
             {type.members.map((member, index) => (
                 <>
                     <FieldEditor
@@ -136,6 +246,9 @@ export const RecordEditor = forwardRef<{ addMember: () => void }, RecordEditorPr
                         onValidationError={onValidationError}
                         onFieldValidation={(isIdentifier, hasError) => handleFieldValidation(index, isIdentifier, hasError)}
                         onRecordValidation={handleNestedRecordError}
+                        extendedTypeFields={extendedTypeFields}
+                        onRemoveExtendedType={onRemoveExtendedType}
+                        readOnly={readOnly}
                     />
                 </>
             ))}

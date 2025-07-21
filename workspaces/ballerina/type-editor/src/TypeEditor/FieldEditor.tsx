@@ -35,6 +35,9 @@ interface FieldEditorProps {
     onFieldValidation: (isIdentifier: boolean, hasError: boolean) => void;
     onRecordValidation: (hasError: boolean) => void;
     onDelete: () => void;
+    extendedTypeFields?: { [typeName: string]: Member[] };
+    onRemoveExtendedType?: (typeName: string) => void;
+    readOnly?: boolean;
 }
 
 const ButtonDeactivated = styled.div<{}>`
@@ -65,68 +68,82 @@ const CollapsibleSection = styled.div`
 `;
 
 export const FieldEditor: React.FC<FieldEditorProps> = (props) => {
-    const { member, onChange, onDelete, type, onValidationError, onFieldValidation, onRecordValidation } = props;
+    const { member, onChange, onDelete, type, onValidationError, onFieldValidation, onRecordValidation, extendedTypeFields, onRemoveExtendedType, readOnly = false } = props;
     const [panelOpened, setPanelOpened] = useState<boolean>(false);
     const recordEditorRef = useRef<{ addMember: () => void }>(null);
     const currentImports = useRef<Imports | undefined>();
 
     const toggleOptional = () => {
-        onChange({
-            ...member,
-            optional: !member.optional
-        });
+        if (!readOnly) {
+            onChange({
+                ...member,
+                optional: !member.optional
+            });
+        }
     };
 
     const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        onChange({
-            ...member,
-            docs: e.target.value
-        });
+        if (!readOnly) {
+            onChange({
+                ...member,
+                docs: e.target.value
+            });
+        }
     }
 
     const handleNameChange = (value: string) => {
-        onChange({
-            ...member,
-            name: value
-        });
+        if (!readOnly) {
+            onChange({
+                ...member,
+                name: value
+            });
+        }
     }
 
     const handleTypeChange = (value: string) => {
-        onChange({
-            ...member,
-            type: value,
-            imports: currentImports.current
-        });
-        currentImports.current = undefined;
+        if (!readOnly) {
+            onChange({
+                ...member,
+                type: value,
+                imports: currentImports.current
+            });
+            currentImports.current = undefined;
+        }
     }
 
     const handleUpdateImports = (imports: Imports) => {
-        const newImportKey = Object.keys(imports)[0];
-        if (!member.imports || !Object.keys(member.imports)?.includes(newImportKey)) {
-            const updatedImports = { ...member.imports, ...imports };
-            currentImports.current = updatedImports;
+        if (!readOnly) {
+            const newImportKey = Object.keys(imports)[0];
+            if (!member.imports || !Object.keys(member.imports)?.includes(newImportKey)) {
+                const updatedImports = { ...member.imports, ...imports };
+                currentImports.current = updatedImports;
+            }
         }
     }
 
     const handleMemberDefaultValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        onChange({
-            ...member,
-            defaultValue: e.target.value
-        });
+        if (!readOnly) {
+            onChange({
+                ...member,
+                defaultValue: e.target.value
+            });
+        }
     }
 
     const toggleRecord = () => {
-        if (!isRecord(member.type)) {
-            onChange({
-                ...member,
-                //@ts-ignore
-                type: defaultAnonymousRecordType
-            });
-        } else {
-            onChange({
-                ...member,
-                type: 'string'
-            });
+        if (!readOnly) {
+            if (!isRecord(member.type)) {
+                onChange({
+                    ...member,
+                    //@ts-ignore
+                    type: defaultAnonymousRecordType
+                });
+            } else {
+                onChange({
+                    ...member,
+                    type: 'string'
+                });
+            }
         }
     }
 
@@ -151,38 +168,48 @@ export const FieldEditor: React.FC<FieldEditorProps> = (props) => {
                     value={member.name}
                     onChange={handleNameChange}
                     rootType={type}
-                    onValidationError={(hasError) => onFieldValidation(true, hasError)}
+                    onValidationError={(hasError) => readOnly ? () => {} : onFieldValidation(true, hasError)}
+                    readonly={readOnly}
                 />
                 <TypeField
                     type={member.type}
                     memberName={typeToSource(member.type)}
                     onChange={handleTypeChange}
                     onUpdateImports={handleUpdateImports}
-                    onValidationError={(hasError) => onFieldValidation(false, hasError)}
+                    onValidationError={(hasError) => readOnly ? () => {} : onFieldValidation(false, hasError)}
                     rootType={type}
                     isAnonymousRecord={isRecord(member.type)}
                 />
-                <div style={{ display: 'flex', gap: '1px' }}>
-                    {isRecord(member.type) &&
-                        <Button appearance="icon" onClick={() => recordEditorRef.current?.addMember()}>
-                            <Codicon name="add" />
+                {!readOnly && (
+                    <div style={{ display: 'flex', gap: '1px' }}>
+                        {isRecord(member.type) &&
+                            <Button appearance="icon" onClick={() => recordEditorRef.current?.addMember()}>
+                                <Codicon name="add" />
+                            </Button>
+                        }
+                        <Button appearance="icon" onClick={toggleRecord}>
+                            <CurlyBracesIcon isActive={isRecord(member.type)} />
                         </Button>
-                    }
-                    <Button appearance="icon" onClick={toggleRecord}>
-                        <CurlyBracesIcon isActive={isRecord(member.type)} />
-                    </Button>
-                    <Button appearance="icon" onClick={toggleOptional} tooltip='Optional Field'>
+                        <Button appearance="icon" onClick={toggleOptional} tooltip='Optional Field'>
+                            <OptionalFieldIcon isActive={member?.optional} />
+                        </Button>
+                        <Button appearance="icon" onClick={onDelete}>
+                            <Codicon name="trash" />
+                        </Button>
+                    </div>
+                )}
+                {readOnly && (
+                    <div style={{ display: 'flex', gap: '1px' }}>
+                    <Button appearance="icon" onClick={toggleOptional} tooltip='Optional Field' disabled={true}>
                         <OptionalFieldIcon isActive={member?.optional} />
                     </Button>
-                    <Button appearance="icon" onClick={onDelete}>
-                        <Codicon name="trash" />
-                    </Button>
                 </div>
+                )}
             </div>
             {panelOpened && (
                 <CollapsibleSection>
-                    <TextField label='Default Value' value={member.defaultValue} onChange={handleMemberDefaultValueChange} style={{ width: '180px' }} />
-                    <TextField label='Description' value={member.docs} onChange={handleDescriptionChange} style={{ width: '180px' }} />
+                    <TextField label='Default Value' value={member.defaultValue} onChange={handleMemberDefaultValueChange} style={{ width: '180px' }} readOnly={readOnly} />
+                    <TextField label='Description' value={member.docs} onChange={handleDescriptionChange} style={{ width: '180px' }} readOnly={readOnly} />
                 </CollapsibleSection>
             )}
             {isRecord(member.type) && typeof member.type !== 'string' && (
@@ -191,10 +218,13 @@ export const FieldEditor: React.FC<FieldEditorProps> = (props) => {
                         ref={recordEditorRef}
                         isAnonymous={true}
                         type={member.type as Type}
-                        onChange={(type: Type) => onChange({ ...member, type })}
-                        onValidationError={(hasError) => onRecordValidation(hasError)}
+                        onChange={(type: Type) => !readOnly && onChange({ ...member, type })}
+                        onValidationError={(hasError) => !readOnly && onRecordValidation(hasError)}
+                        extendedTypeFields={extendedTypeFields}
+                        onRemoveExtendedType={onRemoveExtendedType}
+                        readOnly={readOnly}
                     />
-                    <AdvancedOptions type={member.type as Type} onChange={(type: Type) => onChange({ ...member, type })} />
+                    {!readOnly && <AdvancedOptions type={member.type as Type} onChange={(type: Type) => onChange({ ...member, type })} />}
                 </div>
             )}
         </>
