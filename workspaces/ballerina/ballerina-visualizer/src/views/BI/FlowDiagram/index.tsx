@@ -61,6 +61,7 @@ import {
     convertDataLoaderCategoriesToSidePanelCategories,
     convertChunkerCategoriesToSidePanelCategories,
     convertKnowledgeBaseCategoriesToSidePanelCategories,
+    convertWorkflowCategoriesToSidePanelCategories,
 } from "../../../utils/bi";
 import { useDraftNodeManager } from "./hooks/useDraftNodeManager";
 import { NodePosition, STNode } from "@wso2/syntax-tree";
@@ -166,6 +167,7 @@ export function BIFlowDiagram(props: BIFlowDiagramProps) {
     const isCreatingNewVectorKnowledgeBase = useRef<boolean>(false);
     const isCreatingNewDataLoader = useRef<boolean>(false);
     const isCreatingNewChunker = useRef<boolean>(false);
+    const isCreatingNewWorkflow = useRef<boolean>(false);
 
     useEffect(() => {
         debouncedGetFlowModelForBreakpoints();
@@ -476,6 +478,44 @@ export function BIFlowDiagram(props: BIFlowDiagramProps) {
             }
         } else {
             console.log(">>> CHUNKER_LIST not found in navigation stack, closing panel");
+            closeSidePanelAndFetchUpdatedFlowModel();
+        }
+    };
+
+    const handleWorkflowAdded = async () => {
+        // Try to navigate back to WORKFLOW_LIST in the stack
+        const foundInStack = popNavigationStackUntilView(SidePanelView.WORKFLOW_LIST);
+
+        if (foundInStack) {
+            setShowProgressIndicator(true);
+            try {
+                const response = await rpcClient.getBIDiagramRpcClient().search({
+                    position: { startLine: targetRef.current.startLine, endLine: targetRef.current.endLine },
+                    filePath: model?.fileName,
+                    queryMap: undefined,
+                    searchKind: "WORKFLOW",
+                });
+                setCategories(convertWorkflowCategoriesToSidePanelCategories(response.categories as Category[]));
+                setSidePanelView(SidePanelView.WORKFLOW_LIST);
+                setShowSidePanel(true);
+            } catch (error) {
+                console.error(">>> Error refreshing workflows", error);
+                // If search is not implemented yet, show empty Workflows category
+                const emptyWorkflowsCategory: Category = {
+                    metadata: {
+                        label: "Workflows",
+                        description: ""
+                    },
+                    items: []
+                };
+                setCategories(convertWorkflowCategoriesToSidePanelCategories([emptyWorkflowsCategory]));
+                setSidePanelView(SidePanelView.WORKFLOW_LIST);
+                setShowSidePanel(true);
+            } finally {
+                setShowProgressIndicator(false);
+            }
+        } else {
+            console.log(">>> WORKFLOW_LIST not found in navigation stack, closing panel");
             closeSidePanelAndFetchUpdatedFlowModel();
         }
     };
@@ -984,6 +1024,10 @@ export function BIFlowDiagram(props: BIFlowDiagramProps) {
         // await handleSearch(searchText, functionType, "CHUNKER");
     };
 
+    const handleSearchWorkflow = async (searchText: string, functionType: FUNCTION_TYPE) => {
+        // await handleSearch(searchText, functionType, "WORKFLOW");
+    };
+
     const updateArtifactLocation = async (artifacts: UpdatedArtifactsResponse) => {
         await rpcClient.getVisualizerRpcClient().updateCurrentArtifactLocation(artifacts);
 
@@ -1015,6 +1059,11 @@ export function BIFlowDiagram(props: BIFlowDiagramProps) {
         if (isCreatingNewChunker.current) {
             isCreatingNewChunker.current = false;
             await handleChunkerAdded();
+            return;
+        }
+        if (isCreatingNewWorkflow.current) {
+            isCreatingNewWorkflow.current = false;
+            await handleWorkflowAdded();
             return;
         }
         closeSidePanelAndFetchUpdatedFlowModel();
@@ -1224,6 +1273,80 @@ export function BIFlowDiagram(props: BIFlowDiagramProps) {
                     .then((response) => {
                         setCategories(convertChunkerCategoriesToSidePanelCategories(response.categories as Category[]));
                         setSidePanelView(SidePanelView.CHUNKER_LIST);
+                        setShowSidePanel(true);
+                    })
+                    .finally(() => {
+                        setShowProgressIndicator(false);
+                    });
+                break;
+
+            case "WORKFLOW":
+                // Push current state to navigation stack
+                pushToNavigationStack(sidePanelView, categories, selectedNodeRef.current, selectedClientName.current);
+                
+                setShowProgressIndicator(true);
+                
+                // Fetch existing workflows for the "Existing Workflows" tab
+                const fetchWorkflows = rpcClient
+                    .getBIDiagramRpcClient()
+                    .search({
+                        position: { startLine: targetRef.current.startLine, endLine: targetRef.current.endLine },
+                        filePath: model?.fileName || fileName,
+                        queryMap: undefined,
+                        searchKind: "WORKFLOW",
+                    })
+                    .then((response) => {
+                        return convertWorkflowCategoriesToSidePanelCategories(response.categories as Category[]);
+                    })
+                    .catch((error) => {
+                        console.error(">>> Error fetching workflows", error);
+                        // If search is not implemented yet, return empty Workflows category
+                        const emptyWorkflowsCategory: Category = {
+                            metadata: {
+                                label: "Workflows",
+                                description: ""
+                            },
+                            items: []
+                        };
+                        return convertWorkflowCategoriesToSidePanelCategories([emptyWorkflowsCategory]);
+                    });
+
+                // Get the workflow form template for the "Create Workflow" tab
+                const workflowCodeData: CodeData = {
+                    node: "WORKFLOW",
+                    isNew: true
+                };
+
+                const fetchTemplate = rpcClient
+                    .getBIDiagramRpcClient()
+                    .getNodeTemplate({
+                        position: targetRef.current.startLine,
+                        filePath: model?.fileName || fileName,
+                        id: workflowCodeData,
+                    })
+                    .then((response): FlowNode | null => {
+                        console.log(">>> Workflow template response:", response);
+                        if (!response || !response.flowNode) {
+                            console.error(">>> Invalid workflow template response", response);
+                            return null;
+                        }
+                        return response.flowNode;
+                    })
+                    .catch((error): null => {
+                        console.error(">>> Error fetching workflow template", error);
+                        return null;
+                    });
+
+                // Wait for both to complete
+                Promise.all([fetchWorkflows, fetchTemplate])
+                    .then(([workflowCategories, workflowTemplate]) => {
+                        setCategories(workflowCategories);
+                        if (workflowTemplate) {
+                            selectedNodeRef.current = workflowTemplate;
+                            nodeTemplateRef.current = workflowTemplate;
+                            showEditForm.current = false;
+                        }
+                        setSidePanelView(SidePanelView.WORKFLOW_LIST);
                         setShowSidePanel(true);
                     })
                     .finally(() => {
@@ -1894,6 +2017,54 @@ export function BIFlowDiagram(props: BIFlowDiagramProps) {
             });
     };
 
+    const handleOnAddNewWorkflow = () => {
+        isCreatingNewWorkflow.current = true;
+        setShowProgressIndicator(true);
+
+        // Push current state to navigation stack
+        pushToNavigationStack(sidePanelView, categories, selectedNodeRef.current, selectedClientName.current);
+
+        // Call getNodeTemplate with WORKFLOW node kind to get the form
+        const workflowCodeData: CodeData = {
+            node: "WORKFLOW",
+            isNew: true
+        };
+
+        rpcClient
+            .getBIDiagramRpcClient()
+            .getNodeTemplate({
+                position: targetRef.current.startLine,
+                filePath: model?.fileName,
+                id: workflowCodeData,
+            })
+            .then((response) => {
+                console.log(">>> Workflow template response:", response);
+                if (!response || !response.flowNode) {
+                    console.error(">>> Invalid workflow template response", response);
+                    isCreatingNewWorkflow.current = false;
+                    setShowProgressIndicator(false);
+                    return;
+                }
+                selectedNodeRef.current = response.flowNode;
+                nodeTemplateRef.current = response.flowNode;
+                showEditForm.current = false;
+                setSidePanelView(SidePanelView.FORM);
+                setShowSidePanel(true);
+            })
+            .catch((error) => {
+                console.error(">>> Error fetching workflow template", error);
+                isCreatingNewWorkflow.current = false;
+                // Show error message to user or navigate back
+                const foundInStack = popNavigationStackUntilView(SidePanelView.WORKFLOW_LIST);
+                if (!foundInStack) {
+                    setShowSidePanel(false);
+                }
+            })
+            .finally(() => {
+                setShowProgressIndicator(false);
+            });
+    };
+
     const handleOnGoToSource = (node: FlowNode) => {
         const targetPosition: NodePosition = {
             startLine: node.codedata.lineRange.startLine.line,
@@ -2452,6 +2623,7 @@ export function BIFlowDiagram(props: BIFlowDiagramProps) {
                 onAddVectorKnowledgeBase={handleOnAddNewVectorKnowledgeBase}
                 onAddDataLoader={handleOnAddNewDataLoader}
                 onAddChunker={handleOnAddNewChunker}
+                onAddWorkflow={handleOnAddNewWorkflow}
                 onSubmitForm={handleOnFormSubmit}
                 showProgressIndicator={showProgressIndicator}
                 onDiscardSuggestions={onDiscardSuggestions}
@@ -2466,6 +2638,7 @@ export function BIFlowDiagram(props: BIFlowDiagramProps) {
                 onSearchVectorKnowledgeBase={handleSearchVectorKnowledgeBase}
                 onSearchDataLoader={handleSearchDataLoader}
                 onSearchChunker={handleSearchChunker}
+                onSearchWorkflow={handleSearchWorkflow}
                 onUpdateNodeWithConnection={updateNodeWithConnection}
                 // AI Agent specific callbacks
                 onEditAgent={handleEditAgent}

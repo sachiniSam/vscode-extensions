@@ -40,6 +40,7 @@ import { FormSubmitOptions } from ".";
 import { ConnectionConfig, ConnectionCreator, ConnectionSelectionList, ConnectionKind } from "../../../components/ConnectionSelector";
 import { RelativeLoader } from "../../../components/RelativeLoader";
 import { LoaderContainer } from "../../../components/RelativeLoader/styles";
+import { WorkflowPanel } from "./WorkflowPanel";
 
 const Container = styled.div`
     display: flex;
@@ -65,6 +66,8 @@ export enum SidePanelView {
     CHUNKER_LIST = "CHUNKER_LIST",
     KNOWLEDGE_BASES = "KNOWLEDGE_BASES",
     KNOWLEDGE_BASE_LIST = "KNOWLEDGE_BASE_LIST",
+    WORKFLOWS = "WORKFLOWS",
+    WORKFLOW_LIST = "WORKFLOW_LIST",
     NEW_AGENT = "NEW_AGENT",
     ADD_TOOL = "ADD_TOOL",
     NEW_TOOL = "NEW_TOOL",
@@ -117,6 +120,7 @@ interface PanelManagerProps {
     onAddVectorKnowledgeBase?: () => void;
     onAddDataLoader?: () => void;
     onAddChunker?: () => void;
+    onAddWorkflow?: () => void;
     onSubmitForm: (updatedNode?: FlowNode, dataMapperMode?: DataMapperDisplayMode, options?: FormSubmitOptions) => void;
     onDiscardSuggestions: () => void;
     onSubPanel: (subPanel: SubPanel) => void;
@@ -130,6 +134,7 @@ interface PanelManagerProps {
     onSearchVectorKnowledgeBase?: (searchText: string, functionType: FUNCTION_TYPE) => void;
     onSearchDataLoader?: (searchText: string, functionType: FUNCTION_TYPE) => void;
     onSearchChunker?: (searchText: string, functionType: FUNCTION_TYPE) => void;
+    onSearchWorkflow?: (searchText: string, functionType: FUNCTION_TYPE) => void;
     onEditAgent?: () => void;
     onNavigateToPanel?: (targetPanel: SidePanelView, connectionKind?: ConnectionKind) => void;
     setSidePanelView: (view: SidePanelView) => void;
@@ -182,6 +187,7 @@ export function PanelManager(props: PanelManagerProps) {
         onAddVectorKnowledgeBase,
         onAddDataLoader,
         onAddChunker,
+        onAddWorkflow,
         onSubmitForm,
         onDiscardSuggestions,
         onSubPanel,
@@ -194,6 +200,7 @@ export function PanelManager(props: PanelManagerProps) {
         onSearchVectorKnowledgeBase,
         onSearchDataLoader,
         onSearchChunker,
+        onSearchWorkflow,
         onSelectNewConnection,
         onUpdateNodeWithConnection,
         onNavigateToPanel,
@@ -523,6 +530,34 @@ export function PanelManager(props: PanelManagerProps) {
                         onClose={onClose}
                         title={"Chunkers"}
                         searchPlaceholder={"Search chunkers"}
+                        onBack={canGoBack ? onBack : undefined}
+                    />
+                );
+
+            case SidePanelView.WORKFLOW_LIST:
+                return (
+                    <WorkflowPanel
+                        categories={categories}
+                        workflowFormNode={selectedNode}
+                        nodeFormTemplate={nodeFormTemplate}
+                        fileName={fileName}
+                        projectPath={projectPath}
+                        showProgressIndicator={showProgressIndicator}
+                        targetLineRange={targetLineRange}
+                        onSelectWorkflow={onSelectNode}
+                        onSubmitForm={onSubmitForm}
+                        onClose={onClose}
+                    />
+                );
+
+            case SidePanelView.WORKFLOWS:
+                return (
+                    <CardList
+                        categories={categories}
+                        onSelect={onSelectNode}
+                        onClose={onClose}
+                        title={"Workflows"}
+                        searchPlaceholder={"Search workflows"}
                         onBack={canGoBack ? onBack : undefined}
                     />
                 );

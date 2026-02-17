@@ -45,6 +45,7 @@ import { ActionExpressionEditor } from "./ActionExpressionEditor";
 import { CheckBoxConditionalEditor } from "./CheckBoxConditionalEditor";
 import { ActionTypeEditor } from "./ActionTypeEditor";
 import { AutoCompleteEditor } from "./AutoCompleteEditor";
+import { WorkflowInputTypeEditor } from "./WorkflowInputTypeEditor";
 
 interface FormFieldEditorProps {
     field: FormField;
@@ -136,6 +137,20 @@ export const EditorFactory = (props: FormFieldEditorProps) => {
                 openRecordEditor={openRecordEditor}
                 handleOnFieldFocus={handleOnFieldFocus}
                 autoFocus={autoFocus}
+                handleOnTypeChange={handleOnTypeChange}
+                handleNewTypeSelected={handleNewTypeSelected}
+            />
+        );
+    } else if (!field.items && field.key === "inputType" && getPrimaryInputType(field.types)?.fieldType === "WORKFLOW_INPUT_TYPE" as any && field.editable) {
+        return (
+            <WorkflowInputTypeEditor
+                field={field}
+                openRecordEditor={openRecordEditor}
+                openFormTypeEditor={openFormTypeEditor}
+                isContextTypeEditorSupported={isContextTypeEditorSupported}
+                handleOnFieldFocus={handleOnFieldFocus}
+                autoFocus={autoFocus}
+                onBlur={onBlur}
                 handleOnTypeChange={handleOnTypeChange}
                 handleNewTypeSelected={handleNewTypeSelected}
             />

@@ -935,6 +935,7 @@ export type SearchKind =
     | "MEMORY"
     | "MEMORY_STORE"
     | "AGENT_TOOL"
+    | "WORKFLOW"
     | "CLASS_INIT";
 
 export type BISearchRequest = {

@@ -20,6 +20,7 @@ import { NodePosition } from "@wso2/syntax-tree";
 import { LinePosition } from "./common";
 import { Diagnostic as VSCodeDiagnostic } from "vscode-languageserver-types";
 import { ValueTypeConstraint } from "../rpc-types/ai-agent/interfaces";
+import { Type } from "./extended-lang-client";
 
 export type { NodePosition };
 
@@ -153,7 +154,8 @@ export type FormFieldInputType = "TEXT" |
     "ENUM" |
     "DM_JOIN_CLAUSE_RHS_EXPRESSION" |
     "RECORD_MAP_EXPRESSION" |
-    "PROMPT";
+    "PROMPT" |
+    "WORKFLOW_INPUT_TYPE";
 
 export interface BaseType {
     fieldType: FormFieldInputType;
@@ -185,11 +187,17 @@ export interface IdentifierType extends BaseType {
     scope: FieldScope;
 }
 
+export interface WorkflowInputType extends BaseType {
+    fieldType: "WORKFLOW_INPUT_TYPE";
+    typeModels?: Type[];  
+}
+
 export type InputType =
     | BaseType
     | DropdownType
     | TemplateType
-    | IdentifierType;
+    | IdentifierType
+    | WorkflowInputType;
 
 export type Property = {
     metadata: Metadata;
@@ -535,6 +543,7 @@ export type NodeKind =
     | "WAIT"
     | "WHILE"
     | "WORKER"
+    | "WORKFLOW"
     | "VARIABLE";
 
 export type OverviewFlow = {

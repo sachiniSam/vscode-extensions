@@ -154,6 +154,18 @@ export const CATEGORY_CONFIGS: Record<string, CategoryConfig> = {
         showWhenEmpty: true,
         useConnectionContainer: true,
         fixed: true
+    },
+    "Workflows": {
+        title: "Workflows",
+        actions: [{
+            type: 'add',
+            tooltip: "",
+            emptyStateLabel: "",
+            handlerKey: 'onAdd'
+        }],
+        showWhenEmpty: true,
+        useConnectionContainer: true,
+        fixed: true
     }
 };
 

@@ -235,6 +235,12 @@ export function convertMemoryStoreCategoriesToSidePanelCategories(categories: Ca
     ));
 }
 
+export function convertWorkflowCategoriesToSidePanelCategories(categories: Category[]): PanelCategory[] {
+    return convertCategoriesToSidePanelCategoriesWithIcon(categories, (codedata) => (
+        <NodeIcon type={codedata?.node} size={24} />
+    ));
+}
+
 export function convertNodePropertiesToFormFields(
     nodeProperties: NodeProperties,
     connections?: FlowNode[],
@@ -377,6 +383,8 @@ export function getContainerTitle(view: SidePanelView, activeNode: FlowNode, cli
     switch (view) {
         case SidePanelView.NODE_LIST:
             return ""; // Show switch instead of title
+        case SidePanelView.WORKFLOW_LIST:
+            return "Workflows";
         case SidePanelView.CONNECTION_CONFIG:
             return `Configure ${getConnectionDisplayName(connectionKind)}`;
         case SidePanelView.CONNECTION_SELECT:
